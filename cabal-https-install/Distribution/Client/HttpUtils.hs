@@ -10,12 +10,16 @@ module Distribution.Client.HttpUtils (
     isOldHackageURI
   ) where
 
+import Network.HTTP.Client (parseUrl, newManager, httpLbs, responseBody, responseStatus)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
+import Network.HTTP.Types.Status (statusIsSuccessful)
+
 import Network.HTTP
          ( Request (..), Response (..), RequestMethod (..)
          , Header(..), HeaderName(..), lookupHeader )
 import Network.HTTP.Proxy ( Proxy(..), fetchProxy)
 import Network.URI
-         ( URI (..), URIAuth (..) )
+         ( URI (..), URIAuth (..), uriToString)
 import Network.Browser
          ( BrowserAction, browse
          , setOutHandler, setErrHandler, setProxy, setAuthorityGen, request)
@@ -24,6 +28,7 @@ import Network.Stream
 import Control.Monad
          ( liftM )
 import qualified Data.ByteString.Lazy.Char8 as ByteString
+import qualified Data.ByteString.Lazy as BS (writeFile)
 import Data.ByteString.Lazy (ByteString)
 
 import qualified Paths_cabal_https_install (version)
@@ -69,7 +74,7 @@ mkRequest uri etag = Request{ rqURI     = uri
                             , rqMethod  = GET
                             , rqHeaders = Header HdrUserAgent userAgent : ifNoneMatchHdr
                             , rqBody    = ByteString.empty }
-  where userAgent = concat [ "cabal-install/", display Paths_cabal_https_install.version
+  where userAgent = concat [ "cabal-https-install/", display Paths_cabal_https_install.version
                            , " (", display buildOS, "; ", display buildArch, ")"
                            ]
         ifNoneMatchHdr = maybe [] (\t -> [Header HdrIfNoneMatch t]) etag
@@ -105,6 +110,18 @@ downloadURI verbosity uri path | uriScheme uri == "file:" = do
   return (FileDownloaded path)
   -- Can we store the hash of the file so we can safely return path when the
   -- hash matches to avoid unnecessary computation?
+downloadURI _verbosity uri path | uriScheme uri == "https:" = do
+  req <- parseUrl (uriToString id uri "")
+  manager <- newManager tlsManagerSettings
+  response <- httpLbs req manager
+  if (statusIsSuccessful (responseStatus response))
+    then do
+      BS.writeFile path (responseBody response)
+      return (FileDownloaded path)
+    else 
+      die $ "Failed to download " ++ show uri ++ " : " ++ show response
+
+
 downloadURI verbosity uri path = do
   let etagPath = path <.> "etag"
   targetExists   <- doesFileExist path
