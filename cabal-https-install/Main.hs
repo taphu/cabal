@@ -136,7 +136,7 @@ import Distribution.Verbosity as Verbosity
          ( Verbosity, normal )
 import Distribution.Version
          ( Version(..), orLaterVersion )
-import qualified Paths_cabal_install (version)
+import qualified Paths_cabal_https_install (version)
 
 import System.Environment       (getArgs, getProgName)
 import System.Exit              (exitFailure)
@@ -192,9 +192,9 @@ mainWorker args = topHandler $
                   ++ "defaults if you run 'cabal update'."
     printOptionsList = putStr . unlines
     printErrors errs = die $ intercalate "\n" errs
-    printNumericVersion = putStrLn $ display Paths_cabal_install.version
+    printNumericVersion = putStrLn $ display Paths_cabal_https_install.version
     printVersion        = putStrLn $ "cabal-install version "
-                                  ++ display Paths_cabal_install.version
+                                  ++ display Paths_cabal_https_install.version
                                   ++ "\nusing version "
                                   ++ display cabalVersion
                                   ++ " of the Cabal library "
